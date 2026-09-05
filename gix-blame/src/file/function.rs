@@ -74,6 +74,8 @@ pub fn file(
 ) -> Result<Outcome, Error> {
     let _span = gix_trace::coarse!("gix_blame::file()", ?file_path, ?start);
 
+    options.ranges.validate()?;
+
     let mut stats = Statistics::default();
     let (mut buf, mut buf2, mut buf3) = (Vec::new(), Vec::new(), Vec::new());
 

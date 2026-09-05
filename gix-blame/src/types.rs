@@ -38,33 +38,43 @@ use crate::file::function::tokens_for_diffing;
 /// - This will be converted to `19..40` internally as the algorithm uses 0-based ranges that are exclusive at the end
 ///
 /// # Empty Ranges
-/// You can blame the entire file by calling `BlameRanges::default()`, or by passing an empty vector to `from_one_based_inclusive_ranges`.
+/// You can blame the entire file by calling `BlameRanges::default()`, or by passing an empty vector to [`BlameRanges::from_one_based_inclusive_ranges()`].
 #[derive(Debug, Clone, Default)]
 pub enum BlameRanges {
     /// Blame the entire file.
     #[default]
     WholeFile,
     /// Blame ranges in 0-based exclusive format.
+    ///
+    /// Each range must be non-empty. [`file()`](crate::file()) returns [`Error::InvalidZeroBasedLineRange`] otherwise.
     PartialFile(Vec<Range<u32>>),
 }
 
 /// Lifecycle
 impl BlameRanges {
-    /// Create from a single 0-based range.
+    /// Create from a single 1-based inclusive range.
     ///
     /// Note that the input range is 1-based inclusive, as used by git, and
-    /// the output is a zero-based `BlameRanges` instance.
+    /// the output is a zero-based exclusive `BlameRanges` instance.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidOneBasedLineRange`] if the range starts at zero or is reversed.
     pub fn from_one_based_inclusive_range(range: RangeInclusive<u32>) -> Result<Self, Error> {
         let zero_based_range = Self::inclusive_to_zero_based_exclusive(range)?;
         Ok(Self::PartialFile(vec![zero_based_range]))
     }
 
-    /// Create from multiple 0-based ranges.
+    /// Create from multiple 1-based inclusive ranges.
     ///
     /// Note that the input ranges are 1-based inclusive, as used by git, and
-    /// the output is a zero-based `BlameRanges` instance.
+    /// the output is a zero-based exclusive `BlameRanges` instance.
     ///
-    /// If the input vector is empty, the result will be `WholeFile`.
+    /// If the input vector is empty, the entire file will be blamed.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidOneBasedLineRange`] if any range starts at zero or is reversed.
     pub fn from_one_based_inclusive_ranges(ranges: Vec<RangeInclusive<u32>>) -> Result<Self, Error> {
         if ranges.is_empty() {
             return Ok(Self::WholeFile);
@@ -83,12 +93,21 @@ impl BlameRanges {
 
     /// Convert a 1-based inclusive range to a 0-based exclusive range.
     fn inclusive_to_zero_based_exclusive(range: RangeInclusive<u32>) -> Result<Range<u32>, Error> {
-        if range.start() == &0 {
+        if range.start() == &0 || range.is_empty() {
             return Err(Error::InvalidOneBasedLineRange);
         }
         let start = range.start() - 1;
         let end = *range.end();
         Ok(start..end)
+    }
+
+    pub(crate) fn validate(&self) -> Result<(), Error> {
+        if let Self::PartialFile(ranges) = self
+            && ranges.iter().any(Range::is_empty)
+        {
+            return Err(Error::InvalidZeroBasedLineRange);
+        }
+        Ok(())
     }
 }
 
@@ -96,6 +115,10 @@ impl BlameRanges {
     /// Add a single range to blame.
     ///
     /// The new range will be merged with any overlapping existing ranges.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidOneBasedLineRange`] if the range starts at zero or is reversed.
     pub fn add_one_based_inclusive_range(&mut self, new_range: RangeInclusive<u32>) -> Result<(), Error> {
         let zero_based_range = Self::inclusive_to_zero_based_exclusive(new_range)?;
         self.merge_zero_based_exclusive_range(zero_based_range);
@@ -103,7 +126,7 @@ impl BlameRanges {
         Ok(())
     }
 
-    /// Adds a new ranges, merging it with any existing overlapping ranges.
+    /// Add a new range, merging it with any existing overlapping ranges.
     fn merge_zero_based_exclusive_range(&mut self, new_range: Range<u32>) {
         match self {
             Self::PartialFile(ranges) => {

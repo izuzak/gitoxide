@@ -1,6 +1,6 @@
 use gix_object::bstr::BString;
 
-/// The error returned by [file()](crate::file()).
+/// Errors returned by [`file()`](crate::file()) and [`BlameRanges`](crate::BlameRanges) methods.
 #[derive(Debug, thiserror::Error)]
 #[expect(missing_docs)]
 pub enum Error {
@@ -33,6 +33,8 @@ pub enum Error {
         "Invalid line range was given, line range is expected to be a 1-based inclusive range in the format '<start>,<end>'"
     )]
     InvalidOneBasedLineRange,
+    #[error("Invalid line range was given, line ranges must be non-empty 0-based exclusive ranges")]
+    InvalidZeroBasedLineRange,
     #[error("Failure to decode commit during traversal")]
     DecodeCommit(#[from] gix_object::decode::Error),
     #[error("Failed to get parent from commitgraph during traversal")]

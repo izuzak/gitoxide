@@ -450,6 +450,32 @@ mod blame_ranges {
     use gix_blame::BlameRanges;
 
     #[test]
+    #[expect(clippy::reversed_empty_ranges)]
+    fn directly_constructed_empty_ranges_are_rejected() -> gix_testtools::Result {
+        let mut fixture = Fixture::new()?;
+
+        for invalid_range in [1..1, 2..1] {
+            let result = fixture.blame_file(
+                "simple.txt".into(),
+                gix_blame::Options {
+                    diff_algorithm: gix_diff::blob::Algorithm::Histogram,
+                    ranges: BlameRanges::PartialFile(vec![invalid_range.clone()]),
+                    since: None,
+                    rewrites: Some(gix_diff::Rewrites::default()),
+                    debug_track_path: false,
+                },
+            );
+
+            assert!(
+                matches!(result, Err(gix_blame::Error::InvalidZeroBasedLineRange)),
+                "directly constructed empty range {invalid_range:?} should be rejected"
+            );
+        }
+
+        Ok(())
+    }
+
+    #[test]
     fn line_range() -> gix_testtools::Result {
         let Fixture {
             odb,
