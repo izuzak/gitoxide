@@ -996,6 +996,39 @@ mod blame_ranges {
     }
 
     #[test]
+    #[expect(clippy::reversed_empty_ranges)]
+    fn constructors_reject_reversed_ranges() {
+        let single = BlameRanges::from_one_based_inclusive_range(2..=1);
+        assert!(
+            matches!(single, Err(Error::InvalidOneBasedLineRange)),
+            "the single-range constructor should reject reversed ranges"
+        );
+
+        let multiple = BlameRanges::from_one_based_inclusive_ranges(vec![1..=2, 4..=3]);
+        assert!(
+            matches!(multiple, Err(Error::InvalidOneBasedLineRange)),
+            "the multiple-range constructor should reject any reversed range"
+        );
+    }
+
+    #[test]
+    #[expect(clippy::reversed_empty_ranges)]
+    fn adding_a_reversed_range_is_rejected() {
+        let mut ranges = BlameRanges::default();
+
+        let result = ranges.add_one_based_inclusive_range(2..=1);
+
+        assert!(
+            matches!(result, Err(Error::InvalidOneBasedLineRange)),
+            "adding a reversed range should fail"
+        );
+        assert!(
+            ranges.is_whole_file(),
+            "rejecting the range should leave the existing selection unchanged"
+        );
+    }
+
+    #[test]
     fn create_from_single_range() {
         let ranges = BlameRanges::from_one_based_inclusive_range(20..=40).unwrap();
 
@@ -1065,7 +1098,7 @@ mod blame_ranges {
 
     #[test]
     fn convert_full_file_to_zero_based() {
-        let ranges = BlameRanges::WholeFile;
+        let ranges = BlameRanges::default();
 
         assert_eq!(ranges.to_zero_based_exclusive_ranges(100), vec![0..100]);
     }
@@ -1076,6 +1109,7 @@ mod blame_ranges {
 
         ranges.add_one_based_inclusive_range(1..=10).unwrap();
 
+        assert!(!ranges.is_whole_file());
         assert_eq!(ranges.to_zero_based_exclusive_ranges(100), vec![0..10]);
     }
 
@@ -1107,6 +1141,6 @@ mod blame_ranges {
     fn default_is_full_file() {
         let ranges = BlameRanges::default();
 
-        assert!(matches!(ranges, BlameRanges::WholeFile));
+        assert!(ranges.is_whole_file());
     }
 }

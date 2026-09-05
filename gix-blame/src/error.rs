@@ -1,6 +1,6 @@
 use gix_object::bstr::BString;
 
-/// The error returned by [file()](crate::file()).
+/// Errors returned by [`file()`](crate::file()) and [`BlameRanges`](crate::BlameRanges) methods.
 #[derive(Debug, thiserror::Error)]
 #[expect(missing_docs)]
 pub enum Error {
